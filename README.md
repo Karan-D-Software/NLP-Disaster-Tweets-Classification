@@ -84,7 +84,7 @@ We performed various visualizations to understand the data better:
    plt.title('Top 10 Locations by Frequency')
    plt.show()
    ```
-   ![Top 10 Locations by Frequency](path_to_image4.png)
+   ![Top 10 Locations by Frequency](./images/top10.png)
 
    The distribution of locations shows that most tweets are from the USA, New York, and other prominent locations. Location data can help in understanding regional patterns in disaster reporting and may enhance the model's ability to correctly classify tweets based on where they originate.
 
@@ -111,7 +111,99 @@ Based on the exploratory data analysis, the plan for analysis includes:
 
 ## 🏗️ Model Architecture
 
+### Model Description and Reasoning
 
+**TF-IDF Vectorization:**
+TF-IDF (Term Frequency-Inverse Document Frequency) is a statistical measure used to evaluate the importance of a word in a document relative to a collection of documents (corpus). The TF-IDF value increases proportionally to the number of times a word appears in the document but is offset by the frequency of the word in the corpus, which helps to adjust for the fact that some words appear more frequently in general.
+
+**Neural Network with LSTM:**
+We built and trained a sequential neural network using Long Short-Term Memory (LSTM) layers. LSTMs are a type of Recurrent Neural Network (RNN) architecture that are well-suited for sequential data like text because they can capture long-term dependencies. Unlike traditional RNNs, LSTMs are capable of learning and remembering over long sequences, which is crucial for understanding context in text data where the meaning of a word often depends on the words preceding and following it. This ability to retain information over longer periods makes LSTMs particularly effective for natural language processing tasks, such as text classification, where understanding the sequence of words is essential.
+
+We chose LSTM for our model due to its effectiveness in handling the vanishing gradient problem, which is a common issue in standard RNNs. The LSTM architecture includes gates that regulate the flow of information, allowing it to maintain long-term dependencies without losing important information over time. This makes LSTMs more robust for tasks involving longer text sequences. By incorporating bidirectional LSTM layers, our model can capture context from both past and future states, further enhancing its understanding of the text. This bidirectional approach ensures that the model has a more comprehensive view of the text data, improving its ability to accurately classify disaster-related tweets.
+
+### Code for Sequential Neural Network with LSTM
+
+**Import necessary libraries:**
+```python
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout, Bidirectional
+from tensorflow.keras.optimizers import Adam
+```
+
+**Load and preprocess the dataset:**
+```python
+# Load the dataset
+train_df = pd.read_csv('train.csv')
+
+# Data preprocessing
+train_df['keyword'].fillna('none', inplace=True)
+train_df['location'].fillna('unknown', inplace=True)
+train_df['text'] = train_df['text'].str.lower()
+
+# Split the data into training and testing sets
+X = train_df['text']
+y = train_df['target']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+```
+
+**Tokenize and pad sequences:**
+```python
+# Tokenize the text
+tokenizer = Tokenizer(num_words=10000, oov_token='<OOV>')
+tokenizer.fit_on_texts(X_train)
+word_index = tokenizer.word_index
+
+# Convert text to sequences and pad them
+X_train_sequences = tokenizer.texts_to_sequences(X_train)
+X_test_sequences = tokenizer.texts_to_sequences(X_test)
+X_train_padded = pad_sequences(X_train_sequences, maxlen=100, padding='post', truncating='post')
+X_test_padded = pad_sequences(X_test_sequences, maxlen=100, padding='post', truncating='post')
+```
+
+**Build and compile the LSTM model:**
+```python
+# Build the LSTM model
+model = Sequential([
+    Embedding(input_dim=10000, output_dim=64, input_length=100),
+    Bidirectional(LSTM(64, return_sequences=True)),
+    Dropout(0.5),
+    Bidirectional(LSTM(64)),
+    Dropout(0.5),
+    Dense(64, activation='relu'),
+    Dropout(0.5),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model.compile(loss='binary_crossentropy', optimizer=Adam(learning_rate=0.001), metrics=['accuracy'])
+model.summary()
+```
+
+**Train the model:**
+```python
+# Train the model
+history = model.fit(
+    X_train_padded, y_train,
+    epochs=10,
+    batch_size=32,
+    validation_data=(X_test_padded, y_test),
+    verbose=2
+)
+```
+
+**Evaluate the model:**
+```python
+# Evaluate the model
+loss, accuracy = model.evaluate(X_test_padded, y_test, verbose=2)
+print(f'LSTM Model Accuracy: {accuracy}')
+```
+
+The LSTM model showed promising performance with a final accuracy of 76.43% on the test set. The model architecture included an embedding layer, followed by bidirectional LSTM layers, dropout layers to prevent overfitting, and dense layers for final classification. Despite achieving high training accuracy, the validation accuracy indicated some overfitting, as evidenced by the increasing loss and slight decline in validation accuracy over epochs. This model’s ability to capture sequential dependencies in the text data through LSTM layers demonstrates its effectiveness for the text classification task, though further tuning and regularization might improve its generalization to unseen data.
 
 ## 📈 Results and Analysis
 
